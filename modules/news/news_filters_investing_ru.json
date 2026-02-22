@@ -1,0 +1,6 @@
+{
+  "allow_keywords": [],
+  "block_keywords": [],
+  "max_items_to_send": 1,
+  "window_hours": 24
+}

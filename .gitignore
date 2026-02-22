@@ -1,0 +1,7 @@
+.env
+modules/fx/fx_rates_history.json
+modules/news/news_history_24h.json
+logs/
+.vscode/
+*.tmp
+*.log
