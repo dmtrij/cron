@@ -58,7 +58,6 @@ function http_get_with_meta(string $url, ?string $cookieJar = null): array
     $body = curl_exec($ch);
     $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err = (string)curl_error($ch);
-    curl_close($ch);
 
     if ($body === false || $body === '') {
         return [null, $http, $err];

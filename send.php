@@ -6,6 +6,50 @@ require_once __DIR__ . '/config.php';
 function cron_log(string $tag, string $message): void
 {
     $line = date('Y-m-d H:i:s') . " [$tag] $message\n";
+    static $logResetDone = false;
+    static $logResetAllowed = null;
+
+    if ($logResetAllowed === null) {
+        $candidates = [];
+        $scriptFilename = basename((string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+        if ($scriptFilename !== '') {
+            $candidates[] = $scriptFilename;
+        }
+
+        $phpSelf = basename((string)($_SERVER['PHP_SELF'] ?? ''));
+        if ($phpSelf !== '') {
+            $candidates[] = $phpSelf;
+        }
+
+        if (PHP_SAPI === 'cli' && isset($GLOBALS['argv'][0])) {
+            $argv0 = basename((string)$GLOBALS['argv'][0]);
+            if ($argv0 !== '') {
+                $candidates[] = $argv0;
+            }
+        }
+
+        $candidates = array_values(array_unique($candidates));
+        $logResetAllowed =
+            in_array('rss_popular_queue.php', $candidates, true) ||
+            in_array('rss_popular_test_single.php', $candidates, true) ||
+            $tag === 'news_rss_popular';
+    }
+
+    if ($logResetAllowed && !$logResetDone) {
+        $fpReset = @fopen(CRON_LOG_FILE, 'c+b');
+        if ($fpReset !== false) {
+            try {
+                flock($fpReset, LOCK_EX);
+                ftruncate($fpReset, 0);
+                fflush($fpReset);
+            } finally {
+                flock($fpReset, LOCK_UN);
+                fclose($fpReset);
+            }
+        }
+        $logResetDone = true;
+    }
+
     $fp = @fopen(CRON_LOG_FILE, 'ab');
     if ($fp === false) {
         return;

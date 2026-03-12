@@ -27,7 +27,6 @@ function fetch_goldapi_price(string $symbol): array
     $body = curl_exec($ch);
     $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $cerr = curl_error($ch);
-    curl_close($ch);
 
     if ($body === false || $body === '') {
         return ['ok' => false, 'err' => 'empty' . ($cerr ? ",curl={$cerr}" : '')];
