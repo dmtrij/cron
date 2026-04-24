@@ -1,0 +1,13 @@
+{
+  "sources": [
+    { "url": "https://ria.ru/", "name": "RIA", "feeds": ["https://ria.ru/export/rss2/archive/index.xml", "https://news.google.com/rss/search?q=site:ria.ru&hl=ru&gl=RU&ceid=RU:ru"] },
+    { "url": "https://meduza.io/", "name": "Meduza", "feeds": ["https://meduza.io/rss2/all"] },
+    { "url": "https://censor.net/", "name": "Censor", "feeds": ["https://assets.censor.net/rss/censor.net/rss_ru_news.xml"] },
+    { "url": "https://www.liga.net/", "name": "LIGA", "feeds": ["https://www.liga.net/news/rss.xml"] },
+    { "url": "https://www.pravda.com.ua/", "name": "Pravda", "feeds": ["https://www.pravda.com.ua/rus/rss/view_news/"] },
+    { "url": "https://suspilne.media/", "name": "Suspilne", "feeds": ["https://suspilne.media/rss/all.rss"] },
+    { "url": "https://ru.investing.com/", "name": "Investing", "feeds": ["https://ru.investing.com/rss/news.rss"] },
+    { "url": "https://www.finam.ru/", "name": "Finam", "feeds": ["https://www.finam.ru/international/advanced/rsspoint/", "https://www.finam.ru/analysis/forecasts/rsspoint/", "https://www.finam.ru/analysis/conews/rsspoint/"] },
+    { "url": "https://www.rbc.ua/", "name": "RBC", "feeds": ["https://www.rbc.ua/static/rss/all.rus.rss.xml"] }
+  ]
+}

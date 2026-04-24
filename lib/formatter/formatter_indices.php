@@ -1,158 +1,122 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Telegram HTML formatter for indices grouped by regions.
- * Format per item:
- * 📈 Name (Country) — Last (+0,47%)
- * Description
- */
-
-function idx_html_escape(string $s): string
+function indices_change_emoji(float $pct): string
 {
-    return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-}
-
-function idx_norm_pct(string $pct): string
-{
-    $pct = trim($pct);
-    if ($pct === '') {
-        return '';
-    }
-
-    if (!str_contains($pct, '%')) {
-        $pct .= '%';
-    }
-
-    return $pct;
-}
-
-function idx_parse_signed_value(string $value): ?float
-{
-    $value = trim($value);
-    if ($value === '') {
-        return null;
-    }
-
-    $normalized = str_replace([' ', '%', ','], ['', '', '.'], $value);
-    if (!preg_match('~^[+\-]?\d+(\.\d+)?$~', $normalized)) {
-        return null;
-    }
-
-    return (float)$normalized;
-}
-
-function idx_sign_emoji(string $chg, string $pct): string
-{
-    $probe = $chg !== '' ? $chg : $pct;
-    $n = idx_parse_signed_value($probe);
-
-    if ($n === null) {
+    if (abs($pct) <= 0.01) {
         return '⚖️';
     }
-    if ($n > 0) {
-        return '📈';
-    }
-    if ($n < 0) {
-        return '📉';
-    }
 
-    return '⚖️';
+    return $pct > 0 ? '📈' : '📉';
 }
 
-/**
- * rows[]: ['group','label','country','desc','last','chg','chg_pct']
- * returns messages[] (HTML)
- */
-function format_indices_grouped_html(array $rows, int $maxChars = 3800): array
+function indices_num(float $value, int $decimals = 2): string
 {
-    $groups = [
-        'US' => ['flag' => '🇺🇸', 'name' => 'США'],
-        'RU' => ['flag' => '🇷🇺', 'name' => 'РФ'],
-        'EU' => ['flag' => '🇪🇺', 'name' => 'Европа'],
-        'ASIA' => ['flag' => '🇨🇳', 'name' => 'Азия'],
-    ];
-    $order = ['US', 'RU', 'EU', 'ASIA'];
+    return number_format($value, $decimals, '.', ',');
+}
 
-    $byGroup = [];
-    foreach ($rows as $r) {
-        $g = (string)($r['group'] ?? 'ASIA');
-        $byGroup[$g][] = $r;
+function indices_pct(float $pct): string
+{
+    $sign = $pct > 0 ? '+' : '';
+    return $sign . number_format($pct, 2, '.', '') . '%';
+}
+
+function indices_signed_num(float $value, int $decimals = 2): string
+{
+    $sign = $value > 0 ? '+' : '';
+    return $sign . number_format($value, $decimals, '.', ',');
+}
+
+function indices_pad_left(string $value, int $width): string
+{
+    $len = mb_strwidth($value, 'UTF-8');
+    if ($len >= $width) {
+        return $value;
     }
 
-    $parts = [];
-    foreach ($order as $g) {
-        if (empty($byGroup[$g])) {
-            continue;
-        }
+    return str_repeat(' ', $width - $len) . $value;
+}
 
-        $flag = $groups[$g]['flag'] ?? '🌍';
-        $gname = $groups[$g]['name'] ?? $g;
-
-        $items = [];
-        foreach ($byGroup[$g] as $r) {
-            $label = idx_html_escape((string)($r['label'] ?? ''));
-            $country = idx_html_escape((string)($r['country'] ?? ''));
-            $desc = idx_html_escape((string)($r['desc'] ?? ''));
-            $last = idx_html_escape((string)($r['last'] ?? ''));
-            $chg = (string)($r['chg'] ?? '');
-            $pct = idx_norm_pct((string)($r['chg_pct'] ?? ''));
-
-            $emoji = idx_sign_emoji($chg, $pct);
-
-            $line = "{$emoji} {$label}";
-            if ($country !== '') {
-                $line .= " ({$country})";
-            }
-            $line .= " — {$last}";
-            if ($pct !== '') {
-                $line .= " ({$pct})";
-            }
-
-            $item = $line;
-            if ($desc !== '') {
-                $item .= "\n{$desc}";
-            }
-            $items[] = $item;
-        }
-
-        // Header + divider line + one empty line before the first index
-        $section = "{$flag} {$gname}\n────────────";
-        if ($items !== []) {
-            $section .= "\n" . implode("\n\n", $items);
-        }
-
-        $parts[] = $section;
+function indices_pad_right(string $value, int $width): string
+{
+    $len = mb_strwidth($value, 'UTF-8');
+    if ($len >= $width) {
+        return $value;
     }
 
-    // Two empty lines between region blocks.
-    $msg = implode("\n\n\n", $parts);
+    return $value . str_repeat(' ', $width - $len);
+}
 
-    if (mb_strlen($msg, 'UTF-8') <= $maxChars) {
-        return [$msg];
-    }
+function indices_pre_block(array $item): string
+{
+    $label = (string)($item['label'] ?? '');
+    $value = (float)($item['value'] ?? 0.0);
+    $currency = (string)($item['currency'] ?? '');
+    $dayChange = (float)($item['change_day'] ?? 0.0);
+    $dayPct = (float)($item['pct_day'] ?? 0.0);
+    $weekChange = (float)($item['change_week'] ?? 0.0);
+    $weekPct = (float)($item['pct_week'] ?? 0.0);
+    $monthChange = (float)($item['change_month'] ?? 0.0);
+    $monthPct = (float)($item['pct_month'] ?? 0.0);
+    $max30 = (float)($item['max_30'] ?? 0.0);
+    $min30 = (float)($item['min_30'] ?? 0.0);
 
-    $out = [];
-    $cur = '';
-    foreach ($parts as $p) {
-        $candidate = ($cur === '') ? $p : ($cur . "\n\n" . $p);
-        if (mb_strlen($candidate, 'UTF-8') > $maxChars && $cur !== '') {
-            $out[] = $cur;
-            $cur = $p;
-        } else {
-            $cur = $candidate;
-        }
-    }
-    if ($cur !== '') {
-        $out[] = $cur;
-    }
+    $valueLine = $label . ' → ' . indices_num($value) . ($currency !== '' ? ' ' . $currency : '');
+    $nameWidth = 9;
+    $numWidth = 10;
 
-    if (count($out) > 1) {
-        $total = count($out);
-        foreach ($out as $i => $m) {
-            $out[$i] = 'Индексы (' . ($i + 1) . '/' . $total . ")\n\n" . $m;
-        }
-    }
+    $buildLine = static function (string $name, float $change, string $currency, float $pct) use ($nameWidth, $numWidth): string {
+        $left = indices_pad_right($name . ':', $nameWidth);
+        $num = indices_pad_left(indices_signed_num($change), $numWidth);
+        $curr = indices_pad_right(substr($currency, 0, 3), 3);
+        $marker = indices_change_emoji($pct);
+        $pctText = indices_pad_left(indices_pct($pct), 8);
 
-    return $out;
+        return $left . ' ' . $num . ' ' . $curr . '   ' . $marker . '   ' . $pctText;
+    };
+
+    $dayLine = $buildLine('День', $dayChange, $currency, $dayPct);
+    $weekLine = $buildLine('Неделя', $weekChange, $currency, $weekPct);
+    $monthLine = $buildLine('Месяц', $monthChange, $currency, $monthPct);
+    $rangeLine = '30д: ' . indices_num($min30) . ' - ' . indices_num($max30) . ($currency !== '' ? ' ' . $currency : '');
+
+    return '<pre>' .
+        htmlspecialchars($valueLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\n\n" .
+        htmlspecialchars($dayLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\n\n" .
+        htmlspecialchars($weekLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\n\n" .
+        htmlspecialchars($monthLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\n\n" .
+        htmlspecialchars($rangeLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') .
+        '</pre>';
+}
+
+function indices_caption(array $market, array $series): string
+{
+    $dates = array_keys($series);
+    $start = $dates[0] ?? date('Y-m-d');
+    $end = $dates[count($dates) - 1] ?? date('Y-m-d');
+
+    return "📊 " . (string)$market['title'] . "\n\n" .
+        "<i>" . (string)$market['label'] . " за 30 дней\n" .
+        $start . ' - ' . $end . "</i>\n\n" .
+        (string)$market['flag'] . ' ' . (string)$market['country'] . "\n" .
+        (string)$market['full_name'] . "\n" .
+        (string)$market['description'] . "\n\n" .
+        "Индекс на сегодня:\n" .
+        indices_pre_block($market);
+}
+
+function format_indices_fallback_message(array $market, array $series): string
+{
+    $dates = array_keys($series);
+    $start = $dates[0] ?? date('Y-m-d');
+    $end = $dates[count($dates) - 1] ?? date('Y-m-d');
+
+    return "📊 " . (string)$market['title'] . "\n\n" .
+        "<i>" . (string)$market['label'] . " за 30 дней\n" .
+        $start . ' - ' . $end . "</i>\n\n" .
+        (string)$market['flag'] . ' ' . (string)$market['country'] . "\n" .
+        (string)$market['full_name'] . "\n" .
+        (string)$market['description'] . "\n\n" .
+        "Индекс на сегодня:\n" .
+        indices_pre_block($market);
 }

@@ -1,9 +1,32 @@
 <?php
 declare(strict_types=1);
 
+function rss_news_fix_mojibake(string $text): string
+{
+    $text = trim($text);
+    if ($text === '' || !preg_match('~[РСЃÑ]~u', $text)) {
+        return $text;
+    }
+
+    $converted = @iconv('UTF-8', 'Windows-1251//IGNORE', $text);
+    if (!is_string($converted) || $converted === '') {
+        return $text;
+    }
+
+    $restored = @iconv('Windows-1251', 'UTF-8//IGNORE', $converted);
+    if (!is_string($restored) || $restored === '') {
+        return $text;
+    }
+
+    $originalBad = preg_match_all('~[РСЃÑ]~u', $text);
+    $restoredBad = preg_match_all('~[РСЃÑ]~u', $restored);
+
+    return $restoredBad < $originalBad ? trim($restored) : $text;
+}
+
 function rss_news_escape(string $s): string
 {
-    return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return htmlspecialchars(rss_news_fix_mojibake($s), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 function rss_news_host_root_label(string $host): string
@@ -46,7 +69,8 @@ function rss_news_host_root_label(string $host): string
         $root = $parts[0];
     }
 
-    $root = preg_replace('~[^a-z0-9а-яё]+~iu', '', $root) ?? $root;
+    $root = rss_news_fix_mojibake($root);
+    $root = preg_replace('~[^a-z0-9а-яёіїєґ]+~iu', '', $root) ?? $root;
     return trim($root);
 }
 
@@ -66,6 +90,7 @@ function rss_news_source_label(array $item): string
 
     $src = trim((string)($item['src'] ?? ''));
     if ($src !== '') {
+        $src = rss_news_fix_mojibake($src);
         $src = preg_replace('~\b(RU|UA|Russian|Russia|News|Service|Служба)\b~iu', '', $src) ?? $src;
         $src = preg_replace('~\s+~u', ' ', $src) ?? $src;
         $src = trim($src);
@@ -79,19 +104,28 @@ function rss_news_source_label(array $item): string
 
 function rss_news_cleanup_title(string $title): string
 {
-    $title = trim($title);
+    $title = rss_news_fix_mojibake(trim($title));
     $title = preg_replace('~\s*[-|]\s*(Reuters|BBC News|The New York Times|The Guardian)\s*$~i', '', $title);
     return trim((string)$title);
 }
 
-/**
- * items[] = [
- *   'title' => string,
- *   'url'   => string,
- *   'src'   => string,
- *   'pubTs' => int
- * ]
- */
+function rss_news_source_line(array $item): string
+{
+    $url = trim((string)($item['url'] ?? ''));
+    $src = rss_news_source_label($item);
+    $pubTs = (int)($item['pubTs'] ?? 0);
+
+    $line = $url !== ''
+        ? 'Источник: <a href="' . rss_news_escape($url) . '">' . rss_news_escape($src) . '</a>'
+        : 'Источник: ' . rss_news_escape($src);
+
+    if ($pubTs > 0) {
+        $line .= ' • ' . rss_news_escape(date('d.m.Y H:i', $pubTs));
+    }
+
+    return $line;
+}
+
 function format_rss_news_message_block(array $items): string
 {
     if ($items === []) {
@@ -102,22 +136,11 @@ function format_rss_news_message_block(array $items): string
 
     foreach ($items as $item) {
         $title = rss_news_cleanup_title((string)($item['title'] ?? ''));
-        $url   = trim((string)($item['url'] ?? ''));
-        $src   = rss_news_source_label($item);
         if ($title === '') {
             continue;
         }
 
-        $titleEsc = rss_news_escape($title);
-        $srcEsc   = rss_news_escape($src);
-
-        $sourceLine = ($url !== '')
-            ? 'Источник: <a href="' . rss_news_escape($url) . '">' . $srcEsc . '</a>'
-            : 'Источник: ' . $srcEsc;
-
-        $block = "<b>{$titleEsc}</b>\n\n{$sourceLine}";
-
-        $chunks[] = $block;
+        $chunks[] = '<b>' . rss_news_escape($title) . "</b>\n\n" . rss_news_source_line($item);
     }
 
     return implode("\n\n", $chunks);

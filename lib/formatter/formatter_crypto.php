@@ -4,27 +4,44 @@ declare(strict_types=1);
 function crypto_coin_dot(string $ticker): string
 {
     return [
-        'BTC'  => '🟠',
-        'ETH'  => '🟣',
-        'BNB'  => '🟡',
-        'SOL'  => '🔵',
-        'TON'  => '⚪',
+        'BTC' => '🟠',
+        'ETH' => '🟣',
+        'BNB' => '🟡',
+        'SOL' => '🔵',
+        'TON' => '⚪',
         'USDT' => '🟢',
     ][$ticker] ?? '⚫';
 }
 
 function crypto_trend_emoji(float $pct): string
 {
-    if (abs($pct) < 0.01) return '⚖️';
+    if (abs($pct) <= 0.01) {
+        return '⚖️';
+    }
+
     return $pct > 0 ? '📈' : '📉';
 }
 
-function usd_full(float $value): string
+function crypto_usd_price(float $value): string
 {
-    return '$' . number_format($value, 2, '.', ',');
+    if ($value >= 1000) {
+        return number_format($value, 2, '.', ',');
+    }
+
+    if ($value >= 1) {
+        return number_format($value, 4, '.', ',');
+    }
+
+    return number_format($value, 6, '.', ',');
 }
 
-function usd_compact(float $value): string
+function crypto_pct(float $pct): string
+{
+    $sign = $pct > 0 ? '+' : '';
+    return $sign . number_format($pct, 2, '.', '');
+}
+
+function crypto_usd_compact(float $value): string
 {
     $abs = abs($value);
     $suffix = '';
@@ -44,65 +61,42 @@ function usd_compact(float $value): string
         $suffix = 'K';
     }
 
-    $dec = $suffix === '' ? 2 : 1;
-    return '$' . number_format($n, $dec, '.', '') . $suffix;
+    $decimals = $suffix === '' ? 2 : 1;
+    return '$' . number_format($n, $decimals, '.', '') . $suffix;
 }
 
-function pct_format(float $pct): string
+function crypto_pre_block(array $coins): string
 {
-    $sign = $pct > 0 ? '+' : '';
-    return $sign . number_format($pct, 2, '.', '') . '%';
-}
-
-function format_crypto_message_block(array $coins, array $global): string
-{
-    // ===== Текст ДО блока =====
-    $header  = "";
-    // убрали "Свежая сводка:"
-    $header .= "📊 Мониторинг криптовалют\n\n";
-
-    // ===== PRE блок =====
     $lines = [];
+    $count = count($coins);
 
-    foreach ($coins as $index => $c) {
-        $ticker = (string)($c['ticker'] ?? '');
-        if ($ticker === '') continue;
+    foreach ($coins as $index => $coin) {
+        $ticker = (string)($coin['ticker'] ?? '');
+        $price = (float)($coin['price'] ?? 0.0);
+        $pct = (float)($coin['pct'] ?? 0.0);
+        $volume = (float)($coin['volume'] ?? 0.0);
+        $mcap = (float)($coin['mcap'] ?? 0.0);
 
-        $dot   = crypto_coin_dot($ticker);
-        $price = (float)($c['price'] ?? 0.0);
-        $pct   = (float)($c['pct'] ?? 0.0);
-        $vol   = (float)($c['volume'] ?? 0.0);
-        $mcap  = (float)($c['mcap'] ?? 0.0);
+        $lines[] = htmlspecialchars(
+            crypto_coin_dot($ticker) . ' ' . str_pad($ticker, 5, ' ', STR_PAD_RIGHT) . ' ' . crypto_trend_emoji($pct) . ' ' . crypto_pct($pct) . '%',
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+        $lines[] = htmlspecialchars('Цена: $' . number_format($price, 2, '.', ','), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $lines[] = htmlspecialchars('Объем: ' . crypto_usd_compact($volume), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $lines[] = htmlspecialchars('Капитализация: ' . crypto_usd_compact($mcap), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        $emoji = crypto_trend_emoji($pct);
-        $tickerPadded = str_pad($ticker, 5, ' ', STR_PAD_RIGHT);
-
-        $lines[] = "{$dot} {$tickerPadded} {$emoji} " . pct_format($pct);
-        $lines[] = "Цена: " . usd_full($price);
-        $lines[] = "Объем: " . usd_compact($vol);
-        $lines[] = "Капитализация: " . usd_compact($mcap);
-
-        if ($index < count($coins) - 1) {
-            $lines[] = "---";
+        if ($index < $count - 1) {
+            $lines[] = '---';
         }
     }
 
-    $preContent = "\n" . implode("\n", $lines) . "\n";
-    $preContent .= "\u{200B}";
-    $preBlock = "<pre>{$preContent}</pre>";
+    return '<pre>' . implode("\n", $lines) . '</pre>';
+}
 
-    // ===== Текст ПОСЛЕ блока =====
-    $btcDom = (float)($global['btc_dom'] ?? 0.0);
-    $tmcap  = (float)($global['total_mcap'] ?? 0.0);
-    $tvol   = (float)($global['total_vol'] ?? 0.0);
-
-    $footer  = "\n\n";
-    $footer .= "BTC доминирование: " . number_format($btcDom, 2, '.', '') . "%\n";
-    $footer .= "Общая капитализация: " . usd_compact($tmcap) . "\n";
-    $footer .= "Объем торгов: " . usd_compact($tvol);
-    $footer .= "\n\n";
-    // убрали дату/время, спрятали ссылку
-    $footer .= "Источник: <a href=\"https://www.coingecko.com/\">coingecko.com</a>";
-
-    return $header . $preBlock . $footer;
+function format_crypto_message_block(array $coins): string
+{
+    return "📊 Мониторинг криптовалют\n\n" .
+        "Курс криптовалют на сегодня:\n" .
+        crypto_pre_block($coins);
 }

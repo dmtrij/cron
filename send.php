@@ -31,7 +31,6 @@ function cron_log(string $tag, string $message): void
         $candidates = array_values(array_unique($candidates));
         $logResetAllowed =
             in_array('rss_popular_queue.php', $candidates, true) ||
-            in_array('rss_popular_test_single.php', $candidates, true) ||
             $tag === 'news_rss_popular';
     }
 
@@ -122,4 +121,101 @@ function send_to_telegram(string $text, string $tag = 'telegram'): bool
     }
 
     return true;
+}
+
+function send_photo_to_telegram(string $photoPath, string $caption = '', string $tag = 'telegram', bool $captionAboveMedia = false): bool
+{
+    return send_photo_to_telegram_chat(TELEGRAM_CHAT_ID, $photoPath, $caption, $tag, null, $captionAboveMedia) !== null;
+}
+
+function send_photo_to_telegram_chat(
+    string $chatId,
+    string $photoPath,
+    string $caption = '',
+    string $tag = 'telegram',
+    ?array $replyMarkup = null,
+    bool $captionAboveMedia = false
+): ?array
+{
+    if (TELEGRAM_BOT_TOKEN === '' || TELEGRAM_CHAT_ID === '') {
+        cron_log($tag, 'TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are empty');
+        return null;
+    }
+
+    if ($chatId === '') {
+        cron_log($tag, 'chat_id is empty');
+        return null;
+    }
+
+    if (!is_file($photoPath) || !is_readable($photoPath)) {
+        cron_log($tag, 'Photo file is not readable: ' . $photoPath);
+        return null;
+    }
+
+    if (!class_exists('CURLFile')) {
+        cron_log($tag, 'CURLFile is unavailable');
+        return null;
+    }
+
+    $url = 'https://api.telegram.org/bot' . TELEGRAM_BOT_TOKEN . '/sendPhoto';
+    $ch = curl_init($url);
+    if ($ch === false) {
+        cron_log($tag, 'curl_init failed');
+        return null;
+    }
+
+    $data = [
+        'chat_id' => $chatId,
+        'parse_mode' => 'HTML',
+    ];
+
+    $mimeType = function_exists('mime_content_type') ? @mime_content_type($photoPath) : false;
+    if (!is_string($mimeType) || $mimeType === '') {
+        $ext = strtolower((string)pathinfo($photoPath, PATHINFO_EXTENSION));
+        $mimeType = match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            default => 'image/png',
+        };
+    }
+
+    $data['photo'] = new CURLFile($photoPath, $mimeType, basename($photoPath));
+
+    if ($caption !== '') {
+        $data['caption'] = $caption;
+        $data['show_caption_above_media'] = $captionAboveMedia;
+    }
+
+    if ($replyMarkup !== null) {
+        $data['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $data,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => HTTP_TIMEOUT_SEC,
+        CURLOPT_PROXY => '',
+        CURLOPT_NOPROXY => '*',
+    ]);
+
+    $result = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if (!is_string($result) || $result === '') {
+        cron_log($tag, 'Telegram sendPhoto failed; http=' . $httpCode . '; curl=' . $curlError);
+        return null;
+    }
+
+    $json = json_decode($result, true);
+    if (!is_array($json) || !($json['ok'] ?? false)) {
+        $desc = is_array($json) ? (string)($json['description'] ?? 'unknown error') : 'bad JSON';
+        cron_log($tag, 'Telegram sendPhoto ok=false; http=' . $httpCode . '; ' . $desc);
+        return null;
+    }
+
+    return $json;
 }

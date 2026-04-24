@@ -1,0 +1,10 @@
+{
+  "sources": [
+    { "url": "https://www.bbc.com/russian", "name": "BBC Russian", "feeds": ["https://www.bbc.com/russian/index.xml"] },
+    { "url": "https://www.dw.com/", "name": "DW", "feeds": ["https://rss.dw.com/xml/rss-ru-news", "https://rss.dw.com/xml/rss-ru-rus"] },
+    { "url": "https://ru.euronews.com/", "name": "Euronews", "feeds": ["https://ru.euronews.com/rss?format=mrss&level=theme&name=news"] },
+    { "url": "https://nv.ua/", "name": "NV", "feeds": ["https://nv.ua/rss"] },
+    { "url": "https://zn.ua/", "name": "ZN", "feeds": ["https://zn.ua/rss/full/"] },
+    { "url": "https://interfax.com.ua/", "name": "Interfax", "feeds": ["https://interfax.com.ua/news/general/rss"] }
+  ]
+}

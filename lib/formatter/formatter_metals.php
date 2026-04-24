@@ -4,11 +4,11 @@ declare(strict_types=1);
 function metal_dot(string $code): string
 {
     return [
-        'XAU' => '🟡', // Gold
-        'XAG' => '⚪', // Silver
-        'XPT' => '⚫', // Platinum
-        'XPD' => '🟤', // Palladium
-        'HG'  => '🟠', // Copper
+        'XAU' => '🟡',
+        'XAG' => '⚪',
+        'XPT' => '⚫',
+        'XPD' => '🟤',
+        'HG' => '🟠',
     ][$code] ?? '⚫';
 }
 
@@ -20,64 +20,47 @@ function usd_full(float $value): string
 function metals_source_link(string $sourceLabel): string
 {
     $label = htmlspecialchars($sourceLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    $sl = trim($sourceLabel);
+    $sourceLabel = trim($sourceLabel);
 
-    // Если похоже на домен — делаем https://домен
-    if (preg_match('~^[a-z0-9.-]+\.[a-z]{2,}$~i', $sl)) {
-        $url = 'https://' . $sl . '/';
-        $urlEsc = htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        return "<a href=\"{$urlEsc}\">{$label}</a>";
+    if (preg_match('~^[a-z0-9.-]+\.[a-z]{2,}$~i', $sourceLabel)) {
+        $url = 'https://' . $sourceLabel . '/';
+        return '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . $label . '</a>';
     }
 
-    // Иначе просто текст (без ссылки)
     return $label;
 }
 
-/**
- * $items[] = [
- *   'code'  => 'XAU',
- *   'name'  => 'Gold',
- *   'price' => 1985.25,     // null if unavailable
- *   'err'   => 'http=403'   // optional error note
- * ]
- */
-function format_metals_prices_only(array $items, string $sourceLabel, string $stampHuman): string
+function metals_pre_block(array $items): string
 {
-    // stampHuman больше не используем (убрали дату/время в конце)
-
-    // ===== Текст ДО блока =====
-    $header  = "";
-    // убрали "Свежая сводка:"
-    $header .= "📊 Мониторинг драгоценных металлов\n\n";
-
     $lines = [];
     $count = count($items);
 
-    foreach ($items as $i => $m) {
-        $code  = (string)($m['code'] ?? '');
-        $name  = (string)($m['name'] ?? $code);
-        $price = $m['price'] ?? null;
-        $err   = (string)($m['err'] ?? '');
+    foreach ($items as $i => $metal) {
+        $code = (string)($metal['code'] ?? '');
+        $name = (string)($metal['name'] ?? $code);
+        $price = $metal['price'] ?? null;
+        $err = (string)($metal['err'] ?? '');
 
-        $dot = metal_dot($code);
-        $namePadded = str_pad($name, 10, ' ', STR_PAD_RIGHT);
+        $lines[] = htmlspecialchars(metal_dot($code) . ' ' . str_pad($name, 10, ' ', STR_PAD_RIGHT), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        $lines[] = "{$dot} {$namePadded}";
         if (is_numeric($price)) {
-            $lines[] = "Цена: " . usd_full((float)$price);
+            $lines[] = htmlspecialchars('Цена: ' . usd_full((float)$price), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         } else {
-            $lines[] = "Цена: н/д" . ($err !== '' ? " ({$err})" : "");
+            $text = 'Цена: н/д' . ($err !== '' ? " ({$err})" : '');
+            $lines[] = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
-        if ($i < $count - 1) $lines[] = "---";
+        if ($i < $count - 1) {
+            $lines[] = '---';
+        }
     }
 
-    $preContent = "\n" . implode("\n", $lines) . "\n\u{200B}";
-    $preBlock   = "<pre>{$preContent}</pre>";
+    return '<pre>' . implode("\n", $lines) . '</pre>';
+}
 
-    // ===== Текст ПОСЛЕ блока =====
-    $footer  = "\n\n";
-    $footer .= "Источник: " . metals_source_link($sourceLabel);
-
-    return $header . $preBlock . $footer;
+function format_metals_prices_only(array $items, string $sourceLabel, string $stampHuman): string
+{
+    return "📊 Мониторинг драгоценных металлов\n\n" .
+        metals_pre_block($items) .
+        "\n\nИсточник: " . metals_source_link($sourceLabel);
 }

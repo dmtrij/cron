@@ -2,6 +2,15 @@
 modules/fx/fx_rates_history.json
 modules/news/news_history_24h.json
 logs/
+modules/fx/images/*.png
+modules/news/images/*
+!modules/news/images/.gitkeep
+modules/metals/metals_history.json
+modules/metals/images/*.png
+modules/crypto/crypto_history.json
+modules/crypto/images/*.png
+modules/indices/indices_history.json
+modules/indices/images/*.png
 .vscode/
 *.tmp
 *.log
